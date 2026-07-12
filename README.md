@@ -27,3 +27,55 @@
 
 ```bash
 docker run -d --name redis-jobqueue -p 6379:6379 redis:alpine
+```
+
+2. Запуск приложения
+В корневой директории проекта выполните команду для старта сервера:
+
+```bash
+go run cmd/main.go
+```
+
+Вы увидите логи о том, что воркер успешно стартовал, а сервер слушает порт 8080.
+
+📡 Эндпоинты API
+Создание новой задачи
+URL: http://localhost:8080/task
+
+Метод: POST
+
+Заголовки: Content-Type: application/json
+
+Тело запроса (JSON):
+
+```JSON
+{
+    "id": "task-777",
+    "type": "send_email",
+    "payload": "Welcome email to user@example.com"
+}
+```
+
+Пример запроса через cURL:
+
+```bash
+curl -X POST http://localhost:8080/task \
+     -H "Content-Type: application/json" \
+     -d '{"id":"task-777","type":"send_email","payload":"Welcome email to user@example.com"}'
+```
+Успешный ответ (201 Created):
+
+JSON
+{
+    "message": "Task created successfully"
+}
+🔄 Как это работает внутри
+Клиент делает POST-запрос на /task.
+
+TaskHandler парсит JSON и передает его в TaskUsecase.
+
+TaskRepository сериализует структуру в строку и кладет ее в Redis с помощью LPUSH под ключом tasks_queue.
+
+В этот же момент в фоне параллельно крутится горутина воркера (StartWorker), которая каждую секунду опрашивает Redis методом RPOP.
+
+Как только в Redis появляется задача, воркер мгновенно забирает её, десериализует обратно в структуру Go и запускает «обработку» (выводит логи в консоль).
